@@ -886,6 +886,11 @@ const decoImg = id => id.startsWith('y:') ? A.imgOf(id.slice(2)) : `jumak/${deco
 const inv = () => (save.inv = save.inv || {});
 const decoList = () => { const J = jm(); return (J.d = J.d || []); };
 const DZ = y => 2 + Math.round(y / 40); // 아래쪽에 있을수록 앞에 보이게
+// 탁자 윗면: [건물, 가운데 x, 반폭, 윗면 위 y, 바닥 y]. 작은 소품(음식·방석 등)을 여기 올리면 탁자 앞에 보이게 (뒤로 숨지 않게)
+const JSURF = [['bench1', 293, 118, 586, 694], ['bench2', 647, 118, 586, 694], ['counter', 472, 250, 392, 478]];
+const decoZ = (d, D) => { const z = DZ(d.y); if (D[2] > 60) return z; const s = JSURF.find(q => jm().b.includes(q[0]) && Math.abs(d.x - q[1]) <= q[2] && d.y >= q[3] && d.y <= q[4]); return s ? Math.max(z, DZ(s[4]) + 2) : z; };
+// 놓을 수 있는 곳 (장면 좌표): 마당 안쪽. 밖으로 나가면 안쪽 끝에 멈추고 안내
+const decoClamp = (x, y, D) => { const cx = Math.max(30, Math.min(915, x)), cy = Math.max(D[2] + 60, Math.min(1000, y)); return [cx, cy, cx !== x || cy !== y]; };
 function decoSetCheck(){ save.own = save.own || {}; save.sets = save.sets || {}; DSETS.forEach(set => { if (save.sets[set]) return; if (DECO.filter(d => d[4] === set).every(d => save.own[d[0]])) { save.sets[set] = 1; addCoins(60); persist(); toast(t('jSet', { set: t('set_' + set) }), 2400); if (SPEED === 1) confetti(); } }); }
 const updInnDot = () => { const b = $('btnInn'); if (b) b.classList.toggle('dot', !!(save && (canBuild() || mileAny()))); }; // 주막에 새로 지을 게 있으면 빨간 점
 $('btnInn').onclick = () => { if (hammer) { setHammer(false); refund('hammer'); } if (fan) { setFan(false); refund('fan'); } if (!busy) openVillage(); }; // 방망이·부채 고르던 중이면 취소하고 열기
@@ -930,9 +935,10 @@ function drawVillage(fresh){
   let scene = `<div class="jscene${decoEdit ? ' edit' : ''}" style="background-image:url(jumak/floor_${inn}.webp)">`;
   JB.forEach(([id, , parts]) => { const on = J.b.includes(id); parts.forEach(([img, x, y, h]) => { scene += `<img class="jo${on ? '' : ' ghost'}${id === fresh ? ' new' : ''}" src="jumak/o_${img}.webp" style="${jPct(x, y, h)};z-index:${DZ(y)}">`; }); });
   decoList().forEach((d, i) => { const D = decoFind(d.i); if (!D) return;
-    scene += `<img class="jd${D[4] === 'yokai' ? ' jy' : ''}${i === decoSel && decoEdit ? ' sel' : ''}" data-i="${i}" src="${decoImg(d.i)}" draggable="false" style="${jPct(d.x, d.y, D[2])};z-index:${DZ(d.y)};${d.f ? 'transform:translateX(-50%) scaleX(-1)' : ''}">`; });
+    scene += `<img class="jd${D[4] === 'yokai' ? ' jy' : ''}${i === decoSel && decoEdit ? ' sel' : ''}" data-i="${i}" src="${decoImg(d.i)}" draggable="false" style="${jPct(d.x, d.y, D[2])};z-index:${decoZ(d, D)};${d.f ? 'transform:translateX(-50%) scaleX(-1)' : ''}">`; });
   if (decoEdit && decoSel >= 0 && decoList()[decoSel]) { const d = decoList()[decoSel], D = decoFind(d.i);
-    scene += `<div class="jtool" style="left:${d.x / 945 * 100}%;top:${(d.y - D[2]) / 1008 * 100}%"><button data-a="flip">↔ ${t('jFlip')}</button><button data-a="store">↩ ${t('jStore')}</button></div>`; }
+    const below = d.y - D[2] < 110, side = d.x < 190 ? ' jtL' : d.x > 755 ? ' jtR' : '';
+    scene += `<div class="jtool${side}${below ? ' jtB' : ''}" style="${side === ' jtR' ? 'right:6px' : side === ' jtL' ? 'left:6px' : `left:${d.x / 945 * 100}%`};top:${(below ? d.y : d.y - D[2]) / 1008 * 100}%"><button data-a="flip">↔ ${t('jFlip')}</button><button data-a="store">↩ ${t('jStore')}</button></div>`; }
   // 주인장 셋 (주막 타이쿤 주인장): 건물이 생기면 자기 자리에 섬
   [['hwarang', 472, 404, 'counter'], ['mudang', 640, 330, 'kitchen2'], ['namsadang', 330, 1000, 'gate']].forEach(([id, x, y, need], i) => { if (!J.b.includes(need)) return;
     scene += `<div class="jh" style="${jPct(x, y, 112)};aspect-ratio:${HERO[id]}/104;background-image:url(spr/hero_${id}.webp);animation-delay:${-i * .5}s;z-index:${DZ(y) + 1}"></div>`; });
@@ -1001,8 +1007,14 @@ function decoBind(){
   const w = vb.querySelector('.jwrap');
   w.addEventListener('pointerdown', ev => { if (ev.target.closest('.jd,.jtool')) return; const sx = ev.clientX, sy = ev.clientY, l0 = w.scrollLeft, t0 = w.scrollTop; let moved = false;
     const mv = e => { if (Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy) > 6) moved = true; if (ev.pointerType === 'mouse') { w.scrollLeft = l0 - (e.clientX - sx); w.scrollTop = t0 - (e.clientY - sy); } };
-    const up = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); if (!moved && decoSel >= 0) { decoSel = -1; drawVillage(); } };
-    window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); });
+    const up = e => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up);
+      if (moved || e.type === 'pointercancel' || decoSel < 0 || !list[decoSel]) return;
+      const r = sc.getBoundingClientRect(), D = decoFind(list[decoSel].i);
+      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) { decoSel = -1; drawVillage(); return; } // 장면 밖(어두운 테두리)을 누르면 고르기 풀기
+      const tx = (e.clientX - r.left) / r.width * 945, ty = (e.clientY - r.top) / r.height * 1008 + D[2] / 2; // 손가락 자리에 소품 가운데가 오게
+      const [x, y, cut] = decoClamp(Math.round(tx / 12) * 12, Math.round(ty / 12) * 12, D);
+      list[decoSel].x = x; list[decoSel].y = y; persist(); snd('hop'); drawVillage(); if (cut) toast(t('jEdge'), 1800); };
+    window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up); });
   vb.querySelectorAll('.dcard').forEach(b => b.onclick = () => {
     const D = decoFind(b.dataset.d), I2 = inv();
     if (list.length >= DECO_MAX) return toast(t('jFull'), 1600);
@@ -1024,10 +1036,11 @@ function decoBind(){
     const r = sc.getBoundingClientRect(), D = decoFind(d.i), sx = ev.clientX, sy = ev.clientY, ox = d.x, oy = d.y; let moved = false;
     el.setPointerCapture && el.setPointerCapture(ev.pointerId);
     const mv = e => { const dx = (e.clientX - sx) / r.width * 945, dy = (e.clientY - sy) / r.height * 1008; if (Math.abs(dx) + Math.abs(dy) > 8) moved = true;
-      d.x = Math.max(30, Math.min(915, Math.round((ox + dx) / 12) * 12)); d.y = Math.max(D[2] + 60, Math.min(1000, Math.round((oy + dy) / 12) * 12));
-      el.style.left = (d.x / 945 * 100) + '%'; el.style.top = ((d.y - D[2]) / 1008 * 100) + '%'; el.style.zIndex = DZ(d.y); };
-    const up = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); decoSel = moved ? i : (decoSel === i ? -1 : i); persist(); drawVillage(); };
-    window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+      let c; [d.x, d.y, c] = decoClamp(Math.round((ox + dx) / 12) * 12, Math.round((oy + dy) / 12) * 12, D); cut = c;
+      el.style.left = (d.x / 945 * 100) + '%'; el.style.top = ((d.y - D[2]) / 1008 * 100) + '%'; el.style.zIndex = decoZ(d, D); };
+    let cut = false;
+    const up = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); decoSel = moved ? i : (decoSel === i ? -1 : i); persist(); drawVillage(); if (moved && cut) toast(t('jEdge'), 1800); };
+    window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
   }));
 }
 $('vtBuild').onclick = () => { vilTab = 'build'; drawVillage(); };
