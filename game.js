@@ -869,7 +869,7 @@ const DECO = [ // [id, 그림, 장면 높이, 엽전, 세트]
   ['seonang','d_seonang',80,60,'sin'], ['jangseung','d_jangseung',130,80,'sin'], ['sinmok','d_sinmok',170,120,'sin'],
 ];
 const DSETS = ['salim', 'janchi', 'madang', 'sin'], DTABS = DSETS.concat('yokai'), DECO_MAX = 24;
-let decoEdit = false, decoTab = 'salim', decoSel = -1, decoZoom = 1, decoFold = false;
+let decoEdit = false, decoTab = 'salim', decoSel = -1, decoZoom = 1, decoFold = false, decoNew = -1; // decoNew: 방금 놓는 중인 소품 (확인 전) — 놓는 중엔 [뒤집기·확인], 이미 놓인 건 [뒤집기·빼기]
 // 요괴 단계 보상: 집에 보낸 횟수 10 · 50 · 100 → 엽전 + 테두리(동·은·금), 100번이면 주막에 그 요괴를 놓을 수 있음
 const MILE = [10, 50, 100], MCOIN = [30, 80, 150];
 const mileGot = k => ((save.mile = save.mile || {})[k] || 0);
@@ -938,7 +938,7 @@ function drawVillage(fresh){
     scene += `<img class="jd${D[4] === 'yokai' ? ' jy' : ''}${i === decoSel && decoEdit ? ' sel' : ''}" data-i="${i}" src="${decoImg(d.i)}" draggable="false" style="${jPct(d.x, d.y, D[2])};z-index:${decoZ(d, D)};${d.f ? 'transform:translateX(-50%) scaleX(-1)' : ''}">`; });
   if (decoEdit && decoSel >= 0 && decoList()[decoSel]) { const d = decoList()[decoSel], D = decoFind(d.i);
     const below = d.y - D[2] < 110, side = d.x < 190 ? ' jtL' : d.x > 755 ? ' jtR' : '';
-    scene += `<div class="jtool${side}${below ? ' jtB' : ''}" style="${side === ' jtR' ? 'right:6px' : side === ' jtL' ? 'left:6px' : `left:${d.x / 945 * 100}%`};top:${(below ? d.y : d.y - D[2]) / 1008 * 100}%"><button data-a="flip">↔ ${t('jFlip')}</button><button data-a="store">↩ ${t('jStore')}</button></div>`; }
+    scene += `<div class="jtool${side}${below ? ' jtB' : ''}" style="${side === ' jtR' ? 'right:6px' : side === ' jtL' ? 'left:6px' : `left:${d.x / 945 * 100}%`};top:${(below ? d.y : d.y - D[2]) / 1008 * 100}%"><button data-a="flip">↔ ${t('jFlip')}</button>${decoSel === decoNew ? `<button data-a="ok" class="jok">✓ ${t('jOk')}</button>` : `<button data-a="store">↩ ${t('jStore')}</button>`}</div>`; }
   // 주인장 셋 (주막 타이쿤 주인장): 건물이 생기면 자기 자리에 섬
   [['hwarang', 472, 404, 'counter'], ['mudang', 640, 330, 'kitchen2'], ['namsadang', 330, 1000, 'gate']].forEach(([id, x, y, need], i) => { if (!J.b.includes(need)) return;
     scene += `<div class="jh" style="${jPct(x, y, 112)};aspect-ratio:${HERO[id]}/104;background-image:url(spr/hero_${id}.webp);animation-delay:${-i * .5}s;z-index:${DZ(y) + 1}"></div>`; });
@@ -980,7 +980,7 @@ function drawVillage(fresh){
     if (innDone()) { addCoins(100); save.free = save.free || {}; save.free.hint = (save.free.hint || 0) + 1; persist(); renderBoosters(); toast(t('jmReward'), 2400); if (SPEED === 1) confetti(); }
   });
   const mv = $('jMove'); if (mv) mv.onclick = () => { decoList().forEach(d => { inv()[d.i] = (inv()[d.i] || 0) + 1; }); J.d = []; J.a++; J.b = []; persist(); snd('win'); drawVillage(); }; // 이사하면 소품은 보따리로
-  $('jEdit').onclick = () => { decoEdit = !decoEdit; decoSel = -1; decoZoom = 1; drawVillage(); if (decoEdit) decoFit([0, 0]); };
+  $('jEdit').onclick = () => { decoEdit = !decoEdit; decoSel = -1; decoNew = -1; decoZoom = 1; drawVillage(); if (decoEdit) decoFit([0, 0]); };
   if (decoEdit) { decoFit(keep); decoBind(); }
   const gb = $('vilBuild').querySelector('.jgift'); if (gb) gb.onclick = () => { const n = Math.min(30, 5 * guests.length); J.g = Date.now(); persist(); coinFly(gb, n); setTimeout(() => addCoins(n), 700); toast(t('jmGift', { n }), 1800); gb.remove(); };
   cue($('vilBuild')); cue($('vilBuild').querySelector('.vlist')); $('vilBuild').querySelectorAll('.jg').forEach(el => el.onclick = () => { snd('hop'); flash(el, 'jump'); toast(A.nameOf(el.dataset.k), 1200); });
@@ -991,7 +991,9 @@ function decoFit(keep, focus){
   const fit = () => { const base = Math.max(200, Math.min(w.clientWidth, w.clientHeight * 945 / 1008)), sw = Math.round(base * decoZoom);
     sc.style.width = sw + 'px'; sc.style.height = Math.round(sw * 1008 / 945) + 'px';
     if (focus) { w.scrollLeft = focus[0] * sw - w.clientWidth / 2; w.scrollTop = focus[1] * sw * 1008 / 945 - w.clientHeight / 2; }
-    else if (keep) { w.scrollLeft = keep[0]; w.scrollTop = keep[1]; } };
+    else if (keep) { w.scrollLeft = keep[0]; w.scrollTop = keep[1]; }
+    const tl = sc.querySelector('.jtool'); if (tl && !tl.classList.contains('jtL') && !tl.classList.contains('jtR')) { const r = tl.getBoundingClientRect(), s = sc.getBoundingClientRect();
+      if (r.left < s.left + 4) { tl.classList.add('jtL'); tl.style.left = '6px'; } else if (r.right > s.right - 4) { tl.classList.add('jtR'); tl.style.left = 'auto'; tl.style.right = '6px'; } } };
   fit(); requestAnimationFrame(fit);
 }
 window.addEventListener('resize', () => { if (decoEdit && $('ovVillage').classList.contains('show')) decoFit([0, 0]); });
@@ -1010,7 +1012,7 @@ function decoBind(){
     const up = e => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up);
       if (moved || e.type === 'pointercancel' || decoSel < 0 || !list[decoSel]) return;
       const r = sc.getBoundingClientRect(), D = decoFind(list[decoSel].i);
-      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) { decoSel = -1; drawVillage(); return; } // 장면 밖(어두운 테두리)을 누르면 고르기 풀기
+      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) { decoSel = -1; decoNew = -1; drawVillage(); return; } // 장면 밖(어두운 테두리)을 누르면 고르기 풀기
       const tx = (e.clientX - r.left) / r.width * 945, ty = (e.clientY - r.top) / r.height * 1008 + D[2] / 2; // 손가락 자리에 소품 가운데가 오게
       const [x, y, cut] = decoClamp(Math.round(tx / 12) * 12, Math.round(ty / 12) * 12, D);
       list[decoSel].x = x; list[decoSel].y = y; persist(); snd('hop'); drawVillage(); if (cut) toast(t('jEdge'), 1800); };
@@ -1024,11 +1026,12 @@ function decoBind(){
     else return toast(t('jBuyNo'), 1800);
     let px = 472 + (list.length % 5 - 2) * 60, py = 720; if (decoZoom > 1) { const r = sc.getBoundingClientRect(), wr = w.getBoundingClientRect(); px = Math.round(((wr.left + wr.width / 2) - r.left) / r.width * 945); py = Math.round(((wr.top + wr.height * .6) - r.top) / r.height * 1008); }
     px = Math.max(30, Math.min(915, px)); py = Math.max(D[2] + 60, Math.min(1000, py));
-    list.push({ i: D[0], x: px, y: py, f: 0 }); decoSel = list.length - 1; persist(); snd('hop'); drawVillage(); decoSetCheck();
+    list.push({ i: D[0], x: px, y: py, f: 0 }); decoSel = decoNew = list.length - 1; persist(); snd('hop'); drawVillage(); decoSetCheck();
   });
   const tool = vb.querySelector('.jtool'); if (tool) tool.querySelectorAll('button').forEach(b => b.onclick = () => {
     const d = list[decoSel]; if (!d) return;
-    if (b.dataset.a === 'flip') d.f = d.f ? 0 : 1; else { inv()[d.i] = (inv()[d.i] || 0) + 1; list.splice(decoSel, 1); decoSel = -1; }
+    if (b.dataset.a === 'ok') { const i = decoSel; decoSel = decoNew = -1; persist(); snd('hop'); buzz(15); drawVillage(); flash(vb.querySelector(`.jd[data-i="${i}"]`), 'jump'); return; } // 확인: 다 놓았어 (저장은 이미 됨, 고르기만 풀고 톡 튀기)
+    if (b.dataset.a === 'flip') d.f = d.f ? 0 : 1; else { inv()[d.i] = (inv()[d.i] || 0) + 1; list.splice(decoSel, 1); if (decoNew > decoSel) decoNew--; else if (decoNew === decoSel) decoNew = -1; decoSel = -1; }
     persist(); drawVillage(); });
   // 끌어서 옮기기 (장면 좌표로, 칸에 딱 맞게)
   sc.querySelectorAll('.jd').forEach(el => el.addEventListener('pointerdown', ev => {
@@ -1039,7 +1042,7 @@ function decoBind(){
       let c; [d.x, d.y, c] = decoClamp(Math.round((ox + dx) / 12) * 12, Math.round((oy + dy) / 12) * 12, D); cut = c;
       el.style.left = (d.x / 945 * 100) + '%'; el.style.top = ((d.y - D[2]) / 1008 * 100) + '%'; el.style.zIndex = decoZ(d, D); };
     let cut = false;
-    const up = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); decoSel = moved ? i : (decoSel === i ? -1 : i); persist(); drawVillage(); if (moved && cut) toast(t('jEdge'), 1800); };
+    const up = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); decoSel = moved ? i : (decoSel === i ? -1 : i); if (decoSel !== decoNew) decoNew = -1; persist(); drawVillage(); if (moved && cut) toast(t('jEdge'), 1800); };
     window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
   }));
 }
@@ -1047,7 +1050,7 @@ $('vtBuild').onclick = () => { vilTab = 'build'; drawVillage(); };
 $('vtBook').onclick = () => { vilTab = 'book'; drawVillage(); };
 $('villageBar').onclick = openVillage;
 let innFromWin = false;
-$('vilClose').onclick = () => { $('ovVillage').classList.remove('show', 'decofull'); updInnDot(); decoEdit = false; decoSel = -1; decoZoom = 1; if (innFromWin) { innFromWin = false; $('wNext').click(); } }; // 클리어 창에서 주막에 들렀다 닫으면 바로 다음 판으로
+$('vilClose').onclick = () => { $('ovVillage').classList.remove('show', 'decofull'); updInnDot(); decoEdit = false; decoSel = -1; decoNew = -1; decoZoom = 1; if (innFromWin) { innFromWin = false; $('wNext').click(); } }; // 클리어 창에서 주막에 들렀다 닫으면 바로 다음 판으로
 $('wInn').onclick = () => { innFromWin = true; $('ovWin').classList.remove('show'); openVillage(); };
 
 // ---------- 메뉴 ----------
