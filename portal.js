@@ -42,6 +42,7 @@
     name: target, isApp,
     adsDisabled: CFG.ads === false,   // 이 판은 광고가 없음 → 광고 버튼 대신 엽전
     adblock: false,
+    adTest: target === 'onestore' && Q.get('adtest') === '1', // 원스토어 테스트 주소에만 붙임 (실제 실행 주소엔 없음)
     noAds: CFG.ads === false,          // 광고 버튼을 숨길지 (광고 없는 판 + 광고 차단)
     locale: null,
     gameplayStart(){ if (playing) return; playing = true; ready.then(() => { try { cg() ? cg().game.gameplayStart() : pk() && pk().gameplayStart(); } catch (e) {} }); },
@@ -67,9 +68,10 @@
     dataSet(k, v){ try { if (cg() && cg().data) cg().data.setItem(k, v); } catch (e) {} try { const C = window.__CAP; if (C && C.Preferences) C.Preferences.set({ key: k, value: v }).catch(() => {}); } catch (e) {} },
     // 레벨 사이 전면 광고 (광고 제거를 샀거나 광고 없는 판이면 건너뜀)
     levelCleared(next, n, adFree){
-      if (P.adsDisabled || adFree || !MIDGAME_EVERY || (n || 0) <= MIDGAME_FROM) return next();
+      if (P.adTest) adFree = false; // 원스토어 테스트 주소(?adtest=1): 광고 제거 샀어도 판 깰 때마다 전면 광고
+      if (P.adsDisabled || adFree || !MIDGAME_EVERY || (!P.adTest && (n || 0) <= MIDGAME_FROM)) return next();
       cleared++;
-      if (cleared % MIDGAME_EVERY) return next();
+      if (!P.adTest && cleared % MIDGAME_EVERY) return next();
       let done = false; const go = () => { if (done) return; done = true; clearTimeout(guard); mute(false); next(); }; const guard = setTimeout(go, 60000);
       if (isApp) { if (!nAds() || !nAds().showInter) return go(); mute(true); nativeShow('inter', go); return; }
       if (cg()) { try { cg().ad.requestAd('midgame', { adStarted: () => mute(true), adFinished: go, adError: go }); } catch (e) { go(); } return; }

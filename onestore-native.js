@@ -97,6 +97,7 @@ function setupBilling() {
   let ok = false; try { ok = !!PID && sdk.iap.isSupported(); } catch (e) {}
   if (!ok) return;
   let owned = false; try { owned = localStorage.getItem(OWN_KEY) === '1'; } catch (e) {}
+  if (new URLSearchParams(location.search).get('adtest') === '1') owned = false; // 테스트 주소: 산 기록 무시하고 광고 보기 (기기에 남은 기록은 그대로)
   const st = { ready: true, owned, pending: false, checked: true, price: C.priceText || null }; // 가격 조회가 안 되는 앱 버전이면 등록한 값
   const push = ev => { try { window.__billing && window.__billing(JSON.stringify(st), ev); } catch (e) {} };
   const own = () => { st.owned = true; try { localStorage.setItem(OWN_KEY, '1'); } catch (e) {} };
