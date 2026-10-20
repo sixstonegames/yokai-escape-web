@@ -11,7 +11,7 @@ const sdk = createSDK();
 const C = window.YO_OS || {};
 let info = {}, on = false, silent = false, paused = false;
 const fire = (n, d) => { try { window.dispatchEvent(new CustomEvent(n, { detail: d })); } catch (e) {} };
-const sound = () => fire('yo-osmute', silent || paused); // 무음 모드·앱이 멈춤(배경·광고·결제)일 때 소리 끔
+const sound = () => { window.__OS_MUTE = silent || paused; fire('yo-osmute', silent || paused); }; // 무음 모드·앱이 멈춤(배경·광고·결제)일 때 소리 끔
 
 // ---- 앱 이벤트 (initializeAsync 전에 등록) ----
 sdk.on('pause', () => { paused = true; sound(); });
@@ -21,6 +21,7 @@ sdk.on('exit', () => { try { window.__yo && window.__yo.persist && window.__yo.p
 const shown = id => { const el = document.getElementById(id); return !!(el && el.classList.contains('show')); };
 sdk.onBackPressed(() => {
   try {
+    if (typeof window.gameBack === 'function') return !!window.gameBack(); // 안드로이드판과 같은 처리 (창 닫기, 방망이·부채 취소하고 돌려받기)
     const open = ['ovAd', 'ovAsk', 'ovLang', 'ovVillage', 'ovMenu', 'ovIntro'].some(shown) || shown('story');
     if (!open) return false;
     if (shown('ovLang')) { document.getElementById('langClose').click(); return true; }
@@ -48,7 +49,9 @@ window.__OS = {
     startP = window.__OS_READY.then(() => {
       if (!on) return;
       try { sdk.setLoadingProgress(100); } catch (e) {}
-      return sdk.startGameAsync().then(() => { setupAds(); setupBilling(); }, e => off(e && e.reason));
+      // 시작 신호가 안 되면 광고·결제 없이 (광고 자리는 엽전)
+      const noAds = e => { off(e && (e.reason || e.message)); fire('yo-os-noads'); };
+      try { return sdk.startGameAsync().then(() => { if (setupAds()) setupBilling(); }, noAds); } catch (e) { noAds(e); }
     });
     return startP;
   }
@@ -58,15 +61,16 @@ window.__OS = {
 function safeArea(s) {
   if (!s || !(s.top || s.bottom)) return;
   const st = document.createElement('style');
-  st.textContent = `#app{padding-top:${12 + (s.top || 0)}px!important;padding-bottom:${14 + (s.bottom || 0)}px!important}.overlay{padding-top:${16 + (s.top || 0)}px;padding-bottom:${16 + (s.bottom || 0)}px}`;
+  st.textContent = `#app{padding-top:${12 + (s.top || 0)}px!important;padding-bottom:${14 + (s.bottom || 0)}px!important}.overlay{padding-top:${Math.max(58, 16 + (s.top || 0))}px;padding-bottom:${16 + (s.bottom || 0)}px}`;
   document.head.appendChild(st);
 }
 
 // ---- 광고: 보상형·전면 (광고 단위가 없거나 지원 안 하면 YokaiAds 를 안 만듦 → 게임은 광고 자리를 엽전으로) ----
+const REWARD_MS = 180000; // 보상형 광고 한도 3분 (portal.js 의 안전장치 200초보다 먼저 끝나야 보상을 안 놓침)
 function setupAds() {
   let okR = false, okI = false;
   try { okR = !!C.reward && sdk.ads.isSupported('rewarded'); okI = !!C.inter && sdk.ads.isSupported('interstitial'); } catch (e) {}
-  if (!okR) { fire('yo-os-noads'); return; }
+  if (!okR) { fire('yo-os-noads'); return false; } // 광고가 없으면 '광고 제거'도 안 팖 (팔 이유가 없음)
   const preload = () => { try { sdk.ads.loadRewarded({ placementId: C.reward }); } catch (e) {} try { okI && sdk.ads.loadInterstitial({ placementId: C.inter }); } catch (e) {} };
   preload();
   const reply = (id, res) => { try { window.__adReply && window.__adReply(id, res); } catch (e) {} setTimeout(preload, 600); };
@@ -74,7 +78,7 @@ function setupAds() {
     // 보상은 status === 'rewarded' 일 때만. dismissed(중간에 닫음)·failed(no_fill 포함)는 보상 없음
     show(id) {
       const requestId = 'yo-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
-      sdk.ads.showRewardedAsync({ placementId: C.reward, requestId }).then(r => {
+      sdk.ads.showRewardedAsync({ placementId: C.reward, requestId, timeoutMs: REWARD_MS }).then(r => {
         reply(id, r && r.status === 'rewarded' ? 'earned' : r && r.status === 'dismissed' ? 'closed' : 'fail');
       }, () => reply(id, 'fail'));
     },
@@ -87,6 +91,7 @@ function setupAds() {
     privacyRequired: () => false
   };
   fire('yo-ads');
+  return true;
 }
 
 // ---- 결제: 광고 제거 (관리형 상품 1개, 소비 안 함 = 한 번 사면 계속 가짐) ----

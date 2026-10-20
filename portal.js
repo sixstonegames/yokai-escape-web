@@ -53,7 +53,7 @@
       if (P.adsDisabled) return fail('fail');
       if (adBusy) return; adBusy = true; // 두 번 눌러 광고가 겹치지 않게
       let done = false; const end = (good, why) => { if (done) return; done = true; adBusy = false; clearTimeout(guard); mute(false); window.dispatchEvent(new Event('yo-adend')); try { good ? ok() : fail && fail(why || 'fail'); } catch (e) {} }; // 결과는 딱 한 번만
-      const guard = setTimeout(() => end(false, 'fail'), 90000); // 광고가 아무 소식 없이 멈추면 풀어 줌 (소리·버튼 안 막히게)
+      const guard = setTimeout(() => end(false, 'fail'), target === 'onestore' ? 200000 : 90000); // 광고가 아무 소식 없이 멈추면 풀어 줌 (소리·버튼 안 막히게)
       window.dispatchEvent(new Event('yo-adstart'));
       if (isApp) { if (!nAds()) return end(false, 'fail'); mute(true); nativeShow('reward', r => end(r === 'earned', r)); return; }
       if (cg()) { try { cg().ad.requestAd('rewarded', { adStarted: () => mute(true), adFinished: () => end(true), adError: () => end(false, 'fail') }); } catch (e) { end(false, 'fail'); } return; }

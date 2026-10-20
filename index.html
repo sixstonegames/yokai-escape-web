@@ -736,6 +736,11 @@ ul.goals small{color:#8a7a68;font-size:12px}
 .dshelf .dfold{flex:none;align-self:center;border:0;background:#8B5E34;color:#fff;font:800 13px var(--font);border-radius:999px;padding:5px 16px;margin:-2px 0 4px;cursor:pointer}
 .dshelf .dtabs{flex:none;margin:0 0 4px;justify-content:center}
 .dshelf .dtabs button{padding:7px 12px;font-size:13px}
+/* 탭이 넘치면 두 줄로 내리지 말고 한 줄로 밀어서 넘김 (작은 폰에서 소품 칸이 좁아지지 않게). 맞으면 가운데 */
+.dshelf .dtabs{flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.dshelf .dtabs.more{-webkit-mask-image:linear-gradient(to right,#000 82%,transparent);mask-image:linear-gradient(to right,#000 82%,transparent)}.dshelf .dtabs::-webkit-scrollbar{display:none}
+.dshelf .dtabs button{flex:none}.dshelf .dtabs button:first-child{margin-left:auto}.dshelf .dtabs button:last-child{margin-right:auto}
+@media (max-width:359px){.dshelf .dtabs button{padding:6px 10px;font-size:12px}}
 .dshelf .dlist{overflow-y:auto;min-height:0;flex:1 1 auto;grid-template-columns:repeat(auto-fill,minmax(84px,1fr))}
 .dshelf .dhelp{flex:none;margin:2px 0 0;font-size:11px}
 .dshelf .dyn{grid-column:1 / -1;font-size:13px;padding:14px 6px}
@@ -873,15 +878,15 @@ html,body{overscroll-behavior:none}
 <!-- 출시처: onestore -->
 <script>window.YO_CFG={"target": "onestore", "ads": true};</script>
 <script>window.YO_OS={"reward": "xUZTF-NLPN-KWC2-QDY6", "inter": "xB6PE-FHW4-ZUAD-ETED", "product": "remove_ads", "priceText": "2,900원"};</script>
-<script type="module" src="onestore-native.js?v=1020d"></script>
-<script defer src="portal.js?v=1020d"></script>
-<script defer src="i18n.js?v=1020d"></script>
-<script defer src="lang.js?v=1020d"></script>
-<script defer src="engine.js?v=1020d"></script>
-<script defer src="art.js?v=1020d"></script>
-<script defer src="chapters.js?v=1020d"></script>
-<script defer src="levels.js?v=1020d"></script>
-<script defer src="daily.js?v=1020d"></script>
-<script defer src="game.js?v=1020d"></script>
+<script type="module" src="onestore-native.js?v=1020e"></script>
+<script defer src="portal.js?v=1020e"></script>
+<script defer src="i18n.js?v=1020e"></script>
+<script defer src="lang.js?v=1020e"></script>
+<script defer src="engine.js?v=1020e"></script>
+<script defer src="art.js?v=1020e"></script>
+<script defer src="chapters.js?v=1020e"></script>
+<script defer src="levels.js?v=1020e"></script>
+<script defer src="daily.js?v=1020e"></script>
+<script defer src="game.js?v=1020e"></script>
 </body>
 </html>

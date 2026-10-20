@@ -15,7 +15,7 @@ if (!save.v3gift) { save.free = save.free || {}; ['fan','undo','pouch','ginseng'
 function persist(){ const s = JSON.stringify(save); try { localStorage.setItem('yo_save3', s); } catch (e) {} if (window.YoPortal) window.YoPortal.dataSet('yo_save3', s); }
 
 // ---------- 소리 ----------
-let actx = null, osMute = false; // osMute: 원스토어 앱이 알려 주는 무음 모드·멈춤
+let actx = null, osMute = !!window.__OS_MUTE; // osMute: 원스토어 앱이 알려 주는 무음 모드·멈춤
 function tone(f, t0, dur, type, vol, f2){ const o = actx.createOscillator(), g = actx.createGain(); o.connect(g); g.connect(actx.destination); o.type = type; o.frequency.setValueAtTime(f, t0); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t0 + dur); g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(.001, t0 + dur); o.start(t0); o.stop(t0 + dur + .02); }
 let combo = 0;
 function snd(k){
@@ -869,7 +869,7 @@ const DECO = [ // [id, 그림, 장면 높이, 엽전, 세트]
   ['seonang','d_seonang',80,60,'sin'], ['jangseung','d_jangseung',130,80,'sin'], ['sinmok','d_sinmok',170,120,'sin'],
 ];
 const DSETS = ['salim', 'janchi', 'madang', 'sin'], DTABS = DSETS.concat('yokai'), DECO_MAX = 24;
-let decoEdit = false, decoTab = 'salim', decoSel = -1, decoZoom = 1, decoFold = false, decoNew = -1; // decoNew: 방금 놓는 중인 소품 (확인 전) — 놓는 중엔 [뒤집기·확인], 이미 놓인 건 [뒤집기·빼기]
+let decoEdit = false, decoTab = 'salim', decoSel = -1, decoZoom = 1, decoFold = false, decoNew = -1, decoDrag = false; // decoNew: 방금 놓는 중인 소품 (확인 전) — 놓는 중엔 [뒤집기·확인], 이미 놓인 건 [뒤집기·빼기]
 // 요괴 단계 보상: 집에 보낸 횟수 10 · 50 · 100 → 엽전 + 테두리(동·은·금), 100번이면 주막에 그 요괴를 놓을 수 있음
 const MILE = [10, 50, 100], MCOIN = [30, 80, 150];
 const mileGot = k => ((save.mile = save.mile || {})[k] || 0);
@@ -980,7 +980,7 @@ function drawVillage(fresh){
     if (innDone()) { addCoins(100); save.free = save.free || {}; save.free.hint = (save.free.hint || 0) + 1; persist(); renderBoosters(); toast(t('jmReward'), 2400); if (SPEED === 1) confetti(); }
   });
   const mv = $('jMove'); if (mv) mv.onclick = () => { decoList().forEach(d => { inv()[d.i] = (inv()[d.i] || 0) + 1; }); J.d = []; J.a++; J.b = []; persist(); snd('win'); drawVillage(); }; // 이사하면 소품은 보따리로
-  $('jEdit').onclick = () => { decoEdit = !decoEdit; decoSel = -1; decoNew = -1; decoZoom = 1; drawVillage(); if (decoEdit) decoFit([0, 0]); };
+  $('jEdit').onclick = () => { decoEdit = !decoEdit; decoDrag = false; decoSel = -1; decoNew = -1; decoZoom = 1; drawVillage(); if (decoEdit) decoFit([0, 0]); };
   if (decoEdit) { decoFit(keep); decoBind(); }
   const gb = $('vilBuild').querySelector('.jgift'); if (gb) gb.onclick = () => { const n = Math.min(30, 5 * guests.length); J.g = Date.now(); persist(); coinFly(gb, n); setTimeout(() => addCoins(n), 700); toast(t('jmGift', { n }), 1800); gb.remove(); };
   cue($('vilBuild')); cue($('vilBuild').querySelector('.vlist')); $('vilBuild').querySelectorAll('.jg').forEach(el => el.onclick = () => { snd('hop'); flash(el, 'jump'); toast(A.nameOf(el.dataset.k), 1200); });
@@ -1003,13 +1003,17 @@ function decoZoomTo(z){ const w = $('vilBuild').querySelector('.jwrap'), sc = w 
 function decoBind(){
   const vb = $('vilBuild'), sc = vb.querySelector('.jscene'), list = decoList();
   vb.querySelectorAll('.dtabs button').forEach(b => b.onclick = () => { decoTab = b.dataset.s; decoFold = false; drawVillage(); });
+  { const dt = vb.querySelector('.dshelf .dtabs'); if (dt) { // 탭이 한 줄에 다 안 들어가면 밀어서 넘김: 고른 탭이 보이게, 오른쪽에 더 있으면 흐리게
+    const more = () => dt.classList.toggle('more', dt.scrollLeft + dt.clientWidth < dt.scrollWidth - 4);
+    const on = dt.querySelector('.on'); if (on && dt.scrollWidth > dt.clientWidth) dt.scrollLeft = Math.max(0, on.offsetLeft - dt.offsetLeft - (dt.clientWidth - on.offsetWidth) / 2);
+    more(); dt.addEventListener('scroll', more, { passive: true }); } }
   $('jFold').onclick = () => { decoFold = !decoFold; drawVillage(); decoFit([0, 0]); };
   $('jZi').onclick = () => decoZoomTo(decoZoom + .5); $('jZo').onclick = () => decoZoomTo(decoZoom - .5);
   // 빈 바닥을 끌면 장면 이동 (마우스), 누르면 고른 소품 풀기. 손가락은 그냥 밀면 움직여
   const w = vb.querySelector('.jwrap');
-  w.addEventListener('pointerdown', ev => { if (ev.target.closest('.jd,.jtool')) return; const sx = ev.clientX, sy = ev.clientY, l0 = w.scrollLeft, t0 = w.scrollTop; let moved = false;
-    const mv = e => { if (Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy) > 6) moved = true; if (ev.pointerType === 'mouse') { w.scrollLeft = l0 - (e.clientX - sx); w.scrollTop = t0 - (e.clientY - sy); } };
-    const up = e => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up);
+  w.addEventListener('pointerdown', ev => { if (ev.target.closest('.jd,.jtool') || decoDrag) return; const pid = ev.pointerId, sx = ev.clientX, sy = ev.clientY, l0 = w.scrollLeft, t0 = w.scrollTop; let moved = false;
+    const mv = e => { if (e.pointerId !== pid) return; if (Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy) > 6) moved = true; if (ev.pointerType === 'mouse') { w.scrollLeft = l0 - (e.clientX - sx); w.scrollTop = t0 - (e.clientY - sy); } };
+    const up = e => { if (e.pointerId !== pid) return; window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up);
       if (moved || e.type === 'pointercancel' || decoSel < 0 || !list[decoSel]) return;
       const r = sc.getBoundingClientRect(), D = decoFind(list[decoSel].i);
       if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) { decoSel = -1; decoNew = -1; drawVillage(); return; } // 장면 밖(어두운 테두리)을 누르면 고르기 풀기
@@ -1035,14 +1039,15 @@ function decoBind(){
     persist(); drawVillage(); });
   // 끌어서 옮기기 (장면 좌표로, 칸에 딱 맞게)
   sc.querySelectorAll('.jd').forEach(el => el.addEventListener('pointerdown', ev => {
-    ev.preventDefault(); ev.stopPropagation(); const i = +el.dataset.i, d = list[i]; if (!d) return;
+    ev.preventDefault(); ev.stopPropagation(); if (decoDrag) return; const i = +el.dataset.i, d = list[i]; if (!d) return; // 두 번째 손가락은 무시 (첫 손가락만 따라감)
+    const pid = ev.pointerId; decoDrag = true;
     const r = sc.getBoundingClientRect(), D = decoFind(d.i), sx = ev.clientX, sy = ev.clientY, ox = d.x, oy = d.y; let moved = false;
-    el.setPointerCapture && el.setPointerCapture(ev.pointerId);
-    const mv = e => { const dx = (e.clientX - sx) / r.width * 945, dy = (e.clientY - sy) / r.height * 1008; if (Math.abs(dx) + Math.abs(dy) > 8) moved = true;
+    try { el.setPointerCapture && el.setPointerCapture(ev.pointerId); } catch (e) {}
+    const mv = e => { if (e.pointerId !== pid) return; const dx = (e.clientX - sx) / r.width * 945, dy = (e.clientY - sy) / r.height * 1008; if (Math.abs(dx) + Math.abs(dy) > 8) moved = true;
       let c; [d.x, d.y, c] = decoClamp(Math.round((ox + dx) / 12) * 12, Math.round((oy + dy) / 12) * 12, D); cut = c;
       el.style.left = (d.x / 945 * 100) + '%'; el.style.top = ((d.y - D[2]) / 1008 * 100) + '%'; el.style.zIndex = decoZ(d, D); };
     let cut = false;
-    const up = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); decoSel = moved ? i : (decoSel === i ? -1 : i); if (decoSel !== decoNew) decoNew = -1; persist(); drawVillage(); if (moved && cut) toast(t('jEdge'), 1800); };
+    const up = e => { if (e.pointerId !== pid) return; decoDrag = false; window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); decoSel = moved ? i : (decoSel === i ? -1 : i); if (decoSel !== decoNew) decoNew = -1; persist(); drawVillage(); if (moved && cut) toast(t('jEdge'), 1800); };
     window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
   }));
 }
@@ -1406,6 +1411,6 @@ renderVillage();
 if (Q.get('ending')) { loadLevel(LAST - 1); playEnding(); }
 else if (TITLE_ON) bootGo = () => loadLevel(start); // start 는 계정 진행을 가져오면 바뀜
 else loadLevel(start);
-window.__yo = { get st(){return st;}, get L(){return L;}, get busy(){return busy;}, get used(){return used;}, E, loadLevel, showChgCard, lose, persist };
+window.__yo = { get st(){return st;}, get osMute(){return osMute;}, get L(){return L;}, get busy(){return busy;}, get used(){return used;}, E, loadLevel, showChgCard, lose, persist };
 window.__yo_load = lv => loadLevelObj(lv, idx);
 })();
